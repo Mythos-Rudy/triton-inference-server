@@ -53,12 +53,13 @@ def callback(user_data, result, error):
 
 class DecoupledTest(unittest.TestCase):
     def setUp(self):
+        self.repeat_like_models = ["repeat_int32", "simple_repeat", "sequence_repeat"]
         self.model_name_ = "repeat_int32"
 
         self.inputs_ = []
-        self.inputs_.append(grpcclient.InferInput('IN', [1, 1], "INT32"))
-        self.inputs_.append(grpcclient.InferInput('DELAY', [1, 1], "UINT32"))
-        self.inputs_.append(grpcclient.InferInput('WAIT', [1, 1], "UINT32"))
+        self.inputs_.append(grpcclient.InferInput('IN', [1], "INT32"))
+        self.inputs_.append(grpcclient.InferInput('DELAY', [1], "UINT32"))
+        self.inputs_.append(grpcclient.InferInput('WAIT', [1], "UINT32"))
 
         self.outputs_ = []
         self.outputs_.append(grpcclient.InferRequestedOutput('OUT'))
@@ -73,17 +74,16 @@ class DecoupledTest(unittest.TestCase):
         input_data = np.arange(start=data_offset,
                                stop=data_offset + repeat_count,
                                dtype=np.int32)
-        input_data = np.expand_dims(input_data, axis=0)
-        self.inputs_[0].set_shape([1, repeat_count])
+        self.inputs_[0].set_shape([repeat_count])
         self.inputs_[0].set_data_from_numpy(input_data)
 
         # Initialize data for DELAY
-        delay_data = (np.ones([1, repeat_count], dtype=np.uint32)) * delay_time
-        self.inputs_[1].set_shape([1, repeat_count])
+        delay_data = (np.ones([repeat_count], dtype=np.uint32)) * delay_time
+        self.inputs_[1].set_shape([repeat_count])
         self.inputs_[1].set_data_from_numpy(delay_data)
 
         # Initialize data for WAIT
-        wait_data = np.array([[wait_time]], dtype=np.uint32)
+        wait_data = np.array([wait_time], dtype=np.uint32)
         self.inputs_[2].set_data_from_numpy(wait_data)
 
         user_data = UserData()
@@ -138,27 +138,31 @@ class DecoupledTest(unittest.TestCase):
         # Note the name of the test one_to_none implies the
         # mapping between requests and responses.
 
-        # Single request case
-        self._decoupled_infer(request_count=1, repeat_count=0)
-        # Multiple request case
-        self._decoupled_infer(request_count=10, repeat_count=0)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            self._decoupled_infer(request_count=1, repeat_count=0)
+            # Multiple request case
+            self._decoupled_infer(request_count=10, repeat_count=0)
 
     def test_one_to_one(self):
         # Test cases where each request generates single response.
         # Note the name of the test one_to_one implies the
         # mapping between requests and responses.
 
-        # Single request case
-        # Release request before the response is delivered
-        self._decoupled_infer(request_count=1, wait_time=500)
-        # Release request after the response is delivered
-        self._decoupled_infer(request_count=1, wait_time=2000)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            # Release request before the response is delivered
+            self._decoupled_infer(request_count=1, wait_time=500)
+            # Release request after the response is delivered
+            self._decoupled_infer(request_count=1, wait_time=2000)
 
-        # Multiple request case
-        # Release request before the response is delivered
-        self._decoupled_infer(request_count=10, wait_time=500)
-        # Release request after the response is delivered
-        self._decoupled_infer(request_count=10, wait_time=2000)
+            # Multiple request case
+            # Release request before the response is delivered
+            self._decoupled_infer(request_count=10, wait_time=500)
+            # Release request after the response is delivered
+            self._decoupled_infer(request_count=10, wait_time=2000)
 
     def test_one_to_many(self):
         # Test cases where each request generates multiple response.
@@ -167,27 +171,29 @@ class DecoupledTest(unittest.TestCase):
 
         self.assertFalse("TRITONSERVER_DELAY_GRPC_RESPONSE" in os.environ)
 
-        # Single request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=2000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=1,
-                              repeat_count=5,
-                              wait_time=10000)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=2000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=1,
+                                repeat_count=5,
+                                wait_time=10000)
 
-        # Multiple request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=10, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=10,
-                              repeat_count=5,
-                              wait_time=2000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=10,
-                              repeat_count=5,
-                              wait_time=10000)
+            # Multiple request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=10, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=10,
+                                repeat_count=5,
+                                wait_time=2000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=10,
+                                repeat_count=5,
+                                wait_time=10000)
 
     def test_one_to_multi_many(self):
         # Test cases where each request generates multiple response but the
@@ -196,27 +202,29 @@ class DecoupledTest(unittest.TestCase):
 
         self.assertTrue("TRITONSERVER_DELAY_GRPC_RESPONSE" in os.environ)
 
-        # Single request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=1, repeat_count=5, wait_time=8000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=1,
-                              repeat_count=5,
-                              wait_time=20000)
+        for model in self.repeat_like_models:
+            self.model_name_ = model
+            # Single request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=1, repeat_count=5, wait_time=8000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=1,
+                                repeat_count=5,
+                                wait_time=20000)
 
-        # Multiple request case
-        # Release request before the first response is delivered
-        self._decoupled_infer(request_count=10, repeat_count=5, wait_time=500)
-        # Release request when the responses are getting delivered
-        self._decoupled_infer(request_count=10,
-                              repeat_count=5,
-                              wait_time=8000)
-        # Release request after all the responses are delivered
-        self._decoupled_infer(request_count=10,
-                              repeat_count=5,
-                              wait_time=20000)
+            # Multiple request case
+            # Release request before the first response is delivered
+            self._decoupled_infer(request_count=10, repeat_count=5, wait_time=500)
+            # Release request when the responses are getting delivered
+            self._decoupled_infer(request_count=10,
+                                repeat_count=5,
+                                wait_time=8000)
+            # Release request after all the responses are delivered
+            self._decoupled_infer(request_count=10,
+                                repeat_count=5,
+                                wait_time=20000)
 
     def _no_streaming_helper(self, protocol):
         data_offset = 100
@@ -227,9 +235,8 @@ class DecoupledTest(unittest.TestCase):
         input_data = np.arange(start=data_offset,
                                stop=data_offset + repeat_count,
                                dtype=np.int32)
-        input_data = np.expand_dims(input_data, axis=0)
-        delay_data = (np.ones([1, repeat_count], dtype=np.uint32)) * delay_time
-        wait_data = np.array([[wait_time]], dtype=np.uint32)
+        delay_data = (np.ones([repeat_count], dtype=np.uint32)) * delay_time
+        wait_data = np.array([wait_time], dtype=np.uint32)
 
         if protocol is "grpc":
             # Use the inputs and outputs from the setUp
@@ -238,18 +245,18 @@ class DecoupledTest(unittest.TestCase):
         else:
             this_inputs = []
             this_inputs.append(
-                httpclient.InferInput('IN', [1, repeat_count], "INT32"))
-            this_inputs.append(httpclient.InferInput('DELAY', [1, 1], "UINT32"))
-            this_inputs.append(httpclient.InferInput('WAIT', [1, 1], "UINT32"))
+                httpclient.InferInput('IN', [repeat_count], "INT32"))
+            this_inputs.append(httpclient.InferInput('DELAY', [1], "UINT32"))
+            this_inputs.append(httpclient.InferInput('WAIT', [1], "UINT32"))
             this_outputs = []
             this_outputs.append(httpclient.InferRequestedOutput('OUT'))
 
         # Initialize data for IN
-        this_inputs[0].set_shape([1, repeat_count])
+        this_inputs[0].set_shape([repeat_count])
         this_inputs[0].set_data_from_numpy(input_data)
 
         # Initialize data for DELAY
-        this_inputs[1].set_shape([1, repeat_count])
+        this_inputs[1].set_shape([repeat_count])
         this_inputs[1].set_data_from_numpy(delay_data)
 
         # Initialize data for WAIT
